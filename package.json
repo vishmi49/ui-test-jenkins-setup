@@ -1,0 +1,21 @@
+{
+  "name": "ui",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "cypress run --spec **/*.spec.js",
+    "test:headless": "cypress run --headless",
+    "test:gha": "npx cypress run --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/reports",
+    "test:cci": "npx cypress run --spec **/product-tests/*.spec.js --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/reports"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "chai": "^5.2.0",
+    "cypress": "^14.0.3",
+    "mochawesome": "^7.1.3",
+    "mochawesome-merge": "^5.0.0",
+    "mochawesome-report-generator": "^6.2.0"
+  }
+}
