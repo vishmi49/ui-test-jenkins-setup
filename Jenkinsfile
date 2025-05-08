@@ -1,14 +1,11 @@
 pipeline {
-  agent {
-    docker {
-      image 'cypress/browsers:node-22.0.0-chrome-122.0.6261.94-1-ff-123.0-edge-122.0.2365.92-1'
-      args '-u root' 
-    }
-  }
-
+  agent any
+  tools {nodejs 'Node22'}
+  
   environment {
-    CI = 'true'
-  }
+       CHROME_BIN = '/bin/google-chrome'
+      
+   }
 
   stages {
 
@@ -34,22 +31,45 @@ pipeline {
 
     stage('Merge Mochawesome Reports') {
       steps {
-        sh '''
-          mkdir -p cypress/results
-          npx mochawesome-merge cypress/results/*.json > cypress/results/merged-reports.json || echo "No reports to merge"
-        '''
+        script {
+          sh 'mkdir -p cypress/reports'
+
+          def reportFiles = sh(script: "ls cypress/results/mochawesome*.json 2>/dev/null | wc -l", returnStdout: true).trim()
+          if (reportFiles != "0") {
+            sh '''
+              npx mochawesome-merge cypress/results/mochawesome*.json > cypress/reports/merged-reports.json
+            '''
+          } else {
+            echo "⚠️ No Mochawesome reports found to merge"
+            writeFile file: 'cypress/reports/merged-reports.json', text: '{}'
+          }
+        }
       }
     }
 
     stage('Generate HTML Report') {
       steps {
-        sh 'npx mochawesome-report-generator cypress/results/merged-reports.json --reportDir cypress/results --reportFilename test-report.html'
+        script {
+          def mergedExists = fileExists('cypress/reports/merged-reports.json')
+          if (mergedExists) {
+            sh 'npx mochawesome-report-generator cypress/reports/merged-reports.json --reportDir cypress/reports --reportFilename test-report.html'
+          } else {
+            echo "⚠️ Merged report file not found. Skipping HTML report generation."
+          }
+        }
       }
     }
 
     stage('Archive Test Report') {
       steps {
-        archiveArtifacts artifacts: 'cypress/results/**', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'cypress/reports/**', allowEmptyArchive: true
+
+      }
+    }
+
+     stage('Cleanup Results Directory') {
+      steps {
+        sh 'rm -rf cypress/results/mochawesome*.json || echo "Nothing to clean."'
       }
     }
   }
