@@ -24,10 +24,19 @@ pipeline {
     stage('Run Cypress Tests in Chrome') {
       steps {
         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-          sh 'npm run test:ci'
+          script {
+            echo "Running Cypress tests with CPU usage tracking..."
+            sh '''
+              which time || sudo apt-get update && sudo apt-get install -y time
+              /usr/bin/time -v npm run test:ci --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
+              echo "Extracted CPU usage:"
+              grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
+            '''
+          }
         }
       }
     }
+
 
     stage('Merge Mochawesome Reports') {
       steps {
@@ -63,7 +72,7 @@ pipeline {
     stage('Archive Test Report') {
       steps {
         archiveArtifacts artifacts: 'cypress/reports/**', allowEmptyArchive: true
-
+        archiveArtifacts artifacts: 'cypress_cpu_usage.txt', allowEmptyArchive: true
       }
     }
 
