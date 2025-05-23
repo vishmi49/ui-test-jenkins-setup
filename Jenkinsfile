@@ -27,8 +27,13 @@ pipeline {
           script {
             echo "Running Cypress tests with CPU usage tracking..."
             sh '''
-              which time || sudo apt-get update && sudo apt-get install -y time
+              if ! which time > /dev/null; then
+                echo "Installing 'time' utility..."
+                sudo apt-get update && sudo apt-get install -y time
+              fi
+
               /usr/bin/time -v npm run test:ci --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
+
               echo "Extracted CPU usage:"
               grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
             '''
@@ -36,7 +41,6 @@ pipeline {
         }
       }
     }
-
 
     stage('Merge Mochawesome Reports') {
       steps {
