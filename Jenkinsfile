@@ -24,7 +24,22 @@ pipeline {
     stage('Run Cypress Tests in Chrome') {
       steps {
         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-          sh 'npm run test:ci'
+          script {
+            echo "Running Cypress tests with CPU usage tracking..."
+            sh '''
+              if ! which time > /dev/null; then
+                echo "Installing 'time' utility..."
+                sudo apt-get update && sudo apt-get install -y time
+              fi
+
+              mkdir -p cypress/results
+
+              { /usr/bin/time -v npm run test:ci; } 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
+
+              echo "Extracted CPU usage:"
+              grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
+            '''
+          }
         }
       }
     }
@@ -63,6 +78,7 @@ pipeline {
     stage('Archive Test Report') {
       steps {
         archiveArtifacts artifacts: 'cypress/reports/**', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'cypress_cpu_usage.txt', allowEmptyArchive: true
 
       }
     }
