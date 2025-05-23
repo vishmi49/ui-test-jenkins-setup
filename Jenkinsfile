@@ -3,7 +3,7 @@ agent any
 tools {nodejs 'Node22'}
 
 environment {
-CHROME\_BIN = '/bin/google-chrome'
+CHROME_BIN = '/bin/google-chrome'
 
 }
 
