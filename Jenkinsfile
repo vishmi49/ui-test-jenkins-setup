@@ -1,11 +1,10 @@
 pipeline {
   agent any
-  tools {nodejs 'Node22'}
-  
+  tools { nodejs 'Node22' }
+
   environment {
-       CHROME_BIN = '/bin/google-chrome'
-      
-   }
+    CHROME_BIN = '/bin/google-chrome'
+  }
 
   stages {
 
@@ -32,8 +31,9 @@ pipeline {
                 sudo apt-get update && sudo apt-get install -y time
               fi
 
-              /usr/bin/time -v npm run test:ci --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
-
+              mkdir -p cypress/results
+              { /usr/bin/time -v npm run test:ci --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results; } 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
+              
               echo "Extracted CPU usage:"
               grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
             '''
@@ -46,15 +46,12 @@ pipeline {
       steps {
         script {
           sh 'mkdir -p cypress/reports'
-
           def reportFiles = sh(script: "ls cypress/results/mochawesome*.json 2>/dev/null | wc -l", returnStdout: true).trim()
           if (reportFiles != "0") {
-            sh '''
-              npx mochawesome-merge cypress/results/mochawesome*.json > cypress/reports/merged-reports.json
-            '''
+            sh 'npx mochawesome-merge cypress/results/*.json > cypress/reports/merged-reports.json'
           } else {
             echo "⚠️ No Mochawesome reports found to merge"
-            writeFile file: 'cypress/reports/merged-reports.json', text: '{}'
+            writeFile file: 'cypress/reports/merged-reports.json', text: '{"stats":{},"results":[]}'
           }
         }
       }
@@ -65,7 +62,13 @@ pipeline {
         script {
           def mergedExists = fileExists('cypress/reports/merged-reports.json')
           if (mergedExists) {
-            sh 'npx mochawesome-report-generator cypress/reports/merged-reports.json --reportDir cypress/reports --reportFilename test-report.html'
+            sh '''
+              if grep -q '"results":\\[\\]' cypress/reports/merged-reports.json; then
+                echo "⚠️ Skipping HTML generation due to empty test results."
+              else
+                npx mochawesome-report-generator cypress/reports/merged-reports.json --reportDir cypress/reports --reportFilename test-report.html
+              fi
+            '''
           } else {
             echo "⚠️ Merged report file not found. Skipping HTML report generation."
           }
@@ -80,7 +83,7 @@ pipeline {
       }
     }
 
-     stage('Cleanup Results Directory') {
+    stage('Cleanup Results Directory') {
       steps {
         sh 'rm -rf cypress/results/mochawesome*.json || echo "Nothing to clean."'
       }
