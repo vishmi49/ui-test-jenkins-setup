@@ -45,11 +45,10 @@ pipeline {
 
               mkdir -p cypress/results
 
-              echo "Executing test command with /usr/bin/time..."
-              { /usr/bin/time -v npm run test:ci; } > cypress_output.log 2> cypress_cpu_usage.txt || echo "⚠️ Cypress tests failed"
-
-              echo "==== Test Output ===="
-              tail -n 20 cypress_output.log || echo "⚠️ No output found"
+              echo "Executing Cypress with CPU tracking..."
+              /usr/bin/time -v npm run test:ci \
+                > >(tee cypress_output.log) \
+                2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
               echo "==== CPU Usage ===="
               grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
