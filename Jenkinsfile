@@ -25,7 +25,7 @@ pipeline {
         sh '''
           echo "Checking Cypress version..."
           npx cypress --version || echo "❌ Cypress not found"
-          
+
           echo "Listing spec files..."
           find . -name "*.spec.js" || echo "❌ No spec files found"
         '''
@@ -37,7 +37,7 @@ pipeline {
         catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
           script {
             echo "Running Cypress tests with CPU usage tracking..."
-            sh '''
+            sh '''#!/bin/bash
               if ! which time > /dev/null; then
                 echo "Installing 'time' utility..."
                 sudo apt-get update && sudo apt-get install -y time
@@ -79,7 +79,7 @@ pipeline {
         script {
           def mergedExists = fileExists('cypress/reports/merged-reports.json')
           if (mergedExists) {
-            sh '''
+            sh '''#!/bin/bash
               if grep -q '"results":\\[\\]' cypress/reports/merged-reports.json; then
                 echo "⚠️ Skipping HTML generation due to empty test results."
               else
