@@ -33,31 +33,30 @@ pipeline {
     }
 
     stage('Run Cypress Tests in Chrome') {
-      steps {
-        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-          script {
-            echo "Running Cypress tests with CPU usage tracking..."
-            sh '''#!/bin/bash
-              if ! which time > /dev/null; then
-                echo "Installing 'time' utility..."
-                sudo apt-get update && sudo apt-get install -y time
-              fi
+  steps {
+    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+      script {
+        echo "Running Cypress tests with CPU usage tracking..."
+        sh '''#!/bin/bash
+          # Install 'time' if not present (no sudo needed)
+          if ! command -v time >/dev/null; then
+            apt-get update && apt-get install -y time
+          fi
 
-              mkdir -p cypress/results
+          mkdir -p cypress/results
 
-              echo "Executing Cypress with CPU tracking..."
-              /usr/bin/time -v npm run test:ci \
-                > >(tee cypress_output.log) \
-                2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
+          echo "Executing Cypress with CPU tracking..."
+          time -v npm run test:ci \
+            > >(tee cypress_output.log) \
+            2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
-              echo "==== CPU Usage ===="
-              grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
-            '''
-          }
-        }
+          echo "==== CPU Usage ===="
+          grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
+        '''
       }
     }
-
+  }
+}
     stage('Merge Mochawesome Reports') {
       steps {
         script {
