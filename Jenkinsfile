@@ -38,15 +38,16 @@ pipeline {
       script {
         echo "Running Cypress tests with CPU usage tracking..."
         sh '''#!/bin/bash
-          # Install 'time' if not present (no sudo needed)
-          if ! command -v time >/dev/null; then
+          # Install GNU time if not already installed
+          if ! [ -x /usr/bin/time ]; then
+            echo "Installing GNU time..."
             apt-get update && apt-get install -y time
           fi
 
           mkdir -p cypress/results
 
           echo "Executing Cypress with CPU tracking..."
-          time -v npm run test:ci \
+          /usr/bin/time -v npm run test:ci \
             > >(tee cypress_output.log) \
             2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
@@ -57,6 +58,7 @@ pipeline {
     }
   }
 }
+
     stage('Merge Mochawesome Reports') {
       steps {
         script {
