@@ -3,7 +3,7 @@ pipeline {
   tools { nodejs 'Node22' }
 
   environment {
-    CHROME_BIN = '/bin/google-chrome'
+    CHROME_BIN = '/usr/bin/google-chrome'
   }
 
   stages {
@@ -20,6 +20,26 @@ pipeline {
       }
     }
 
+    stage('Install Chrome & Dependencies') {
+      steps {
+        sh '''#!/bin/bash
+          echo "Installing Chrome and required dependencies..."
+
+          apt-get update && apt-get install -y \
+            wget gnupg2 libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 \
+            libxss1 libasound2 libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 \
+            fonts-liberation libappindicator3-1 libu2f-udev xvfb time
+
+          # Install Google Chrome (stable version)
+          wget -q -O /tmp/google-chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          apt-get install -y /tmp/google-chrome.deb || apt --fix-broken install -y
+
+          # Ensure symbolic link if not present
+          ln -sf /usr/bin/google-chrome /usr/bin/chrome
+        '''
+      }
+    }
+
     stage('Verify Environment') {
       steps {
         sh '''
@@ -28,48 +48,34 @@ pipeline {
 
           echo "Listing spec files..."
           find . -name "*.spec.js" || echo "❌ No spec files found"
+
+          echo "Google Chrome version:"
+          google-chrome --version || echo "❌ Chrome not found"
         '''
       }
     }
 
     stage('Run Cypress Tests in Chrome') {
-  steps {
-    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-      script {
-        echo "Installing Chrome and Running Cypress tests with CPU usage tracking..."
+      steps {
+        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+          script {
+            echo "Running Cypress tests with CPU usage tracking..."
+            sh '''#!/bin/bash
+              mkdir -p cypress/results
 
-        sh '''#!/bin/bash
-          # Install dependencies
-          apt-get update && apt-get install -y \
-            wget gnupg ca-certificates curl \
-            xvfb libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 \
-            libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 fonts-liberation libappindicator3-1 \
-            time
+              echo "Executing Cypress with CPU tracking..."
+              /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+                npm run test:ci \
+                > >(tee cypress_output.log) \
+                2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
-          # Install latest Google Chrome
-          echo "Installing latest Google Chrome..."
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
-          sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
-          apt-get update && apt-get install -y google-chrome-stable
-
-          # Link for Cypress to detect
-          ln -s /usr/bin/google-chrome /usr/bin/chrome
-
-          mkdir -p cypress/results
-
-          echo "Executing Cypress with CPU tracking via Xvfb..."
-          /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-            npm run test:ci \
-            > >(tee cypress_output.log) \
-            2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
-
-          echo "==== CPU Usage ===="
-          grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
-        '''
+              echo "==== CPU Usage ===="
+              grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
+            '''
+          }
+        }
       }
     }
-  }
-}
 
     stage('Merge Mochawesome Reports') {
       steps {
