@@ -39,7 +39,10 @@ pipeline {
         echo "Running Cypress tests with CPU usage tracking..."
 
         sh '''#!/bin/bash
-          apt-get update && apt-get install -y time xvfb
+          apt-get update && apt-get install -y \
+            xvfb libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 \
+            libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 fonts-liberation libappindicator3-1 \
+            time
 
           mkdir -p cypress/results
 
@@ -56,8 +59,6 @@ pipeline {
     }
   }
 }
-
-
     stage('Merge Mochawesome Reports') {
       steps {
         script {
