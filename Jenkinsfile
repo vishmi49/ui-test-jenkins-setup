@@ -36,13 +36,24 @@ pipeline {
   steps {
     catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
       script {
-        echo "Running Cypress tests with CPU usage tracking..."
+        echo "Installing Chrome and Running Cypress tests with CPU usage tracking..."
 
         sh '''#!/bin/bash
+          # Install dependencies
           apt-get update && apt-get install -y \
+            wget gnupg ca-certificates curl \
             xvfb libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 libxss1 libasound2 \
             libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 fonts-liberation libappindicator3-1 \
             time
+
+          # Install latest Google Chrome
+          echo "Installing latest Google Chrome..."
+          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | apt-key add -
+          sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
+          apt-get update && apt-get install -y google-chrome-stable
+
+          # Link for Cypress to detect
+          ln -s /usr/bin/google-chrome /usr/bin/chrome
 
           mkdir -p cypress/results
 
@@ -59,6 +70,7 @@ pipeline {
     }
   }
 }
+
     stage('Merge Mochawesome Reports') {
       steps {
         script {
