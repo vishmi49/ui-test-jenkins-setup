@@ -5,7 +5,7 @@
   "scripts": {
     "test": "cypress run --spec **/*.spec.js",
     "test:headless": "cypress run --headless",
-    "test:ci": "npx cypress run --spec **/product-tests/*.spec.js --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/results",
+    "test:ci": "npx cypress run --spec **/product-tests/*.spec.js --browser chromium --reporter mochawesome --reporter-options reportDir=cypress/results",
     "test:gha": "npx cypress run --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/reports",
     "test:cci": "npx cypress run --spec **/product-tests/*.spec.js --browser chrome --reporter mochawesome --reporter-options reportDir=cypress/reports"
   },
