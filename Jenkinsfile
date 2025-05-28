@@ -20,21 +20,24 @@ pipeline {
       }
     }
 
-    stage('Install Chromium & Dependencies') {
+    stage('Install Chrome & Dependencies') {
       steps {
         sh '''#!/bin/bash
-          echo "Installing Chromium and required dependencies..."
+          echo "Installing Google Chrome and required dependencies..."
 
           apt-get update && apt-get install -y \
-            chromium chromium-driver \
+            wget curl gnupg2 \
             libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 \
             libxss1 libasound2 libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 \
             fonts-liberation libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
             libpango-1.0-0 libudev1 libxcomposite1 libxdamage1 libxext6 \
             libxfixes3 libxkbcommon0 xvfb time
 
-          # Create a symlink for Chromium to mimic Google Chrome
-          ln -sf /usr/bin/chromium /usr/bin/google-chrome
+          # Download and install Google Chrome
+          wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+          apt install -y ./google-chrome-stable_current_amd64.deb
+
+          # NOTE: In some CI environments, Chrome may require --no-sandbox to run properly.
         '''
       }
     }
@@ -48,7 +51,7 @@ pipeline {
           echo "Listing spec files..."
           find . -name "*.spec.js" || echo "❌ No spec files found"
 
-          echo "Google Chrome (Chromium) version:"
+          echo "Google Chrome version:"
           google-chrome --version || echo "❌ Chrome not found"
         '''
       }
@@ -64,7 +67,7 @@ pipeline {
 
               echo "Executing Cypress with CPU tracking..."
               /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-                npm run test:ci \
+                npx cypress run --browser chrome --headless --no-sandbox \
                 > >(tee cypress_output.log) \
                 2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
