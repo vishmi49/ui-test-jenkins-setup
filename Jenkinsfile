@@ -37,17 +37,15 @@ pipeline {
     catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
       script {
         echo "Running Cypress tests with CPU usage tracking..."
+
         sh '''#!/bin/bash
-          # Install GNU time if not already installed
-          if ! [ -x /usr/bin/time ]; then
-            echo "Installing GNU time..."
-            apt-get update && apt-get install -y time
-          fi
+          apt-get update && apt-get install -y time xvfb
 
           mkdir -p cypress/results
 
-          echo "Executing Cypress with CPU tracking..."
-          /usr/bin/time -v npm run test:ci \
+          echo "Executing Cypress with CPU tracking via Xvfb..."
+          /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            npm run test:ci \
             > >(tee cypress_output.log) \
             2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
@@ -58,6 +56,7 @@ pipeline {
     }
   }
 }
+
 
     stage('Merge Mochawesome Reports') {
       steps {
