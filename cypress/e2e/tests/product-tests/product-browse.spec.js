@@ -10,6 +10,25 @@ describe("Product Details Page", () => {
     return false;
   });
 
+  it("should sort products by product name", () => {
+    productDetailsPage.visit();
+    productDetailsPage.getPageTitle().should("contain", "Jackets");
+    productDetailsPage.getSortByDropdown().select("Product Name");
+    cy.wait(10000);
+
+    const titlesArray = [];
+
+    productDetailsPage
+      .getAllProductTitles()
+      .each(($el, index) => {
+        titlesArray[index] = $el.text().trim();
+      })
+      .then(() => {
+        const sortedTitles = [...titlesArray].sort();
+        expect(titlesArray).to.deep.equal(sortedTitles);
+      });
+  });
+
   it("Should navigate to the home page upon clicking the logo", () => {
     productsMenuPage.visit();
     cy.url().should("include", "/");
@@ -44,25 +63,6 @@ describe("Product Details Page", () => {
       const productPrice = $priceElement.text().trim();
       productDetailsPage.getProductPrice().should("contain", productPrice);
     });
-  });
-
-  it("should sort products by product name", () => {
-    productDetailsPage.visit();
-    productDetailsPage.getPageTitle().should("contain", "Jackets");
-    productDetailsPage.getSortByDropdown().select("Product Name");
-    cy.wait(10000);
-
-    const titlesArray = [];
-
-    productDetailsPage
-      .getAllProductTitles()
-      .each(($el, index) => {
-        titlesArray[index] = $el.text().trim();
-      })
-      .then(() => {
-        const sortedTitles = [...titlesArray].sort();
-        expect(titlesArray).to.deep.equal(sortedTitles);
-      });
   });
 
   it("should filter prodcuts using search bar", () => {

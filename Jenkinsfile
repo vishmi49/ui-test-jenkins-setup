@@ -64,7 +64,7 @@ pipeline {
 
               echo "Executing Cypress with CPU tracking..."
               /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-                npm run test:ci \
+                npm run test \
                 > >(tee cypress_output.log) \
                 2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
 
