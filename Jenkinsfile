@@ -3,7 +3,7 @@ pipeline {
   tools { nodejs 'Node22' }
 
   environment {
-    CHROME_BIN = '/usr/bin/google-chrome'
+    CHROME_BIN = '/usr/bin/chromium'
   }
 
   stages {
@@ -31,8 +31,6 @@ pipeline {
             fonts-liberation libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
             libpango-1.0-0 libudev1 libxcomposite1 libxdamage1 libxext6 \
             libxfixes3 libxkbcommon0 xvfb
-
-          ln -sf /usr/bin/chromium /usr/bin/google-chrome
         '''
       }
     }
@@ -46,8 +44,8 @@ pipeline {
           echo "Spec files:"
           find . -name "*.spec.js" || echo "❌ No spec files found"
 
-          echo "Chrome version:"
-          google-chrome --version || echo "❌ Chrome not found"
+          echo "Chromium version:"
+          chromium --version || echo "❌ Chromium not found"
         '''
       }
     }
@@ -152,7 +150,7 @@ def runCypressChunk(index, totalChunks) {
     while IFS= read -r spec; do
       echo "Running spec: \$spec"
       xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-        npx cypress run --browser chrome \
+        npx cypress run --browser chromium \
         --reporter mochawesome \
         --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \
         --spec "\$spec"
