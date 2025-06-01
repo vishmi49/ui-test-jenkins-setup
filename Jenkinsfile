@@ -133,16 +133,9 @@ pipeline {
 def runCypressChunk(index, totalChunks) {
   sh """
     mkdir -p cypress/results
+
     echo "Splitting specs for chunk ${index}/${totalChunks}"
-    node -e "
-      const fs = require('fs');
-      const glob = require('glob');
-      const specs = glob.sync('cypress/e2e/**/*.spec.js').sort();
-      const chunkSize = Math.ceil(specs.length / ${totalChunks});
-      const start = ${index} * chunkSize;
-      const selected = specs.slice(start, start + chunkSize);
-      fs.writeFileSync('chunk-specs-${index}.txt', selected.join('\\n'));
-    "
+    node scripts/split-specs.js ${index} ${totalChunks}
 
     echo "Running specs for chunk ${index}:"
     cat chunk-specs-${index}.txt
@@ -157,4 +150,3 @@ def runCypressChunk(index, totalChunks) {
     done < chunk-specs-${index}.txt
   """
 }
-
