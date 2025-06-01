@@ -23,8 +23,6 @@ pipeline {
     stage('Install Chromium & Dependencies') {
       steps {
         sh '''#!/bin/bash
-          echo "Installing Chromium and required dependencies..."
-
           apt-get update && apt-get install -y \
             chromium chromium-driver \
             libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 \
@@ -33,7 +31,6 @@ pipeline {
             libpango-1.0-0 libudev1 libxcomposite1 libxdamage1 libxext6 \
             libxfixes3 libxkbcommon0 xvfb time
 
-          # Create a symlink for Chromium to mimic Google Chrome
           ln -sf /usr/bin/chromium /usr/bin/google-chrome
         '''
       }
@@ -42,35 +39,37 @@ pipeline {
     stage('Verify Environment') {
       steps {
         sh '''
-          echo "Checking Cypress version..."
+          echo "Cypress version:"
           npx cypress --version || echo "❌ Cypress not found"
-
-          echo "Listing spec files..."
+          echo "Spec files:"
           find . -name "*.spec.js" || echo "❌ No spec files found"
-
-          echo "Google Chrome (Chromium) version:"
+          echo "Chrome version:"
           google-chrome --version || echo "❌ Chrome not found"
         '''
       }
     }
 
-    stage('Run Cypress Tests in Chrome') {
-      steps {
-        catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
-          script {
-            echo "Running Cypress tests with CPU usage tracking..."
-            sh '''#!/bin/bash
-              mkdir -p cypress/results
-
-              echo "Executing Cypress with CPU tracking..."
-              /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-                npm run test \
-                > >(tee cypress_output.log) \
-                2> >(tee cypress_cpu_usage.txt >&2) || echo "⚠️ Cypress tests failed"
-
-              echo "==== CPU Usage ===="
-              grep "Percent of CPU this job got" cypress_cpu_usage.txt || echo "⚠️ CPU usage not found"
-            '''
+    stage('Run Cypress Tests in Parallel') {
+      parallel {
+        stage('Chunk 1') {
+          steps {
+            script {
+              runCypressChunk(0, 3)
+            }
+          }
+        }
+        stage('Chunk 2') {
+          steps {
+            script {
+              runCypressChunk(1, 3)
+            }
+          }
+        }
+        stage('Chunk 3') {
+          steps {
+            script {
+              runCypressChunk(2, 3)
+            }
           }
         }
       }
@@ -80,12 +79,11 @@ pipeline {
       steps {
         script {
           sh 'mkdir -p cypress/reports'
-
           def reportFiles = sh(script: "ls cypress/results/mochawesome*.json 2>/dev/null | wc -l", returnStdout: true).trim()
           if (reportFiles != "0") {
             sh 'npx mochawesome-merge cypress/results/mochawesome*.json > cypress/reports/merged-reports.json'
           } else {
-            echo "⚠️ No Mochawesome reports found to merge"
+            echo "⚠️ No reports to merge"
             writeFile file: 'cypress/reports/merged-reports.json', text: '{"stats":{},"results":[]}'
           }
         }
@@ -95,17 +93,16 @@ pipeline {
     stage('Generate HTML Report') {
       steps {
         script {
-          def mergedExists = fileExists('cypress/reports/merged-reports.json')
-          if (mergedExists) {
+          if (fileExists('cypress/reports/merged-reports.json')) {
             sh '''#!/bin/bash
               if grep -q '"results":\\[\\]' cypress/reports/merged-reports.json; then
-                echo "⚠️ Skipping HTML generation due to empty test results."
+                echo "⚠️ Empty test results, skipping report generation."
               else
-                npx mochawesome-report-generator cypress/reports/merged-reports.json --reportDir=cypress/reports --reportFilename test-report.html
+                npx mochawesome-report-generator cypress/reports/merged-reports.json \
+                  --reportDir=cypress/reports \
+                  --reportFilename test-report.html
               fi
             '''
-          } else {
-            echo "⚠️ Merged report file not found. Skipping HTML report generation."
           }
         }
       }
@@ -114,8 +111,8 @@ pipeline {
     stage('Archive Test Report') {
       steps {
         archiveArtifacts artifacts: 'cypress/reports/**', allowEmptyArchive: true
-        archiveArtifacts artifacts: 'cypress_cpu_usage.txt', allowEmptyArchive: true
-        archiveArtifacts artifacts: 'cypress_output.log', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'cypress_cpu_usage_*.txt', allowEmptyArchive: true
+        archiveArtifacts artifacts: 'cypress_output_*.log', allowEmptyArchive: true
       }
     }
 
@@ -131,4 +128,33 @@ pipeline {
       echo 'Pipeline finished.'
     }
   }
+}
+
+def runCypressChunk(index, totalChunks) {
+  sh """
+    mkdir -p cypress/results
+    echo "Splitting specs for chunk ${index}/${totalChunks}"
+    node -e "
+      const glob = require('glob');
+      const specs = glob.sync('cypress/e2e/**/*.spec.js').sort();
+      const chunkSize = Math.ceil(specs.length / ${totalChunks});
+      const start = ${index} * chunkSize;
+      const selected = specs.slice(start, start + chunkSize);
+      require('fs').writeFileSync('chunk-specs-${index}.txt', selected.join('\\n'));
+    "
+
+    echo "Running specs for chunk ${index}:"
+    cat chunk-specs-${index}.txt
+
+    while IFS= read -r spec; do
+      echo "Running spec: \$spec"
+      /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+        npx cypress run --browser chrome \
+        --reporter mochawesome \
+        --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \
+        --spec "\$spec" \
+        > "cypress_output_${index}.log" \
+        2> "cypress_cpu_usage_${index}.txt" || echo "⚠️ Failed: \$spec"
+    done < chunk-specs-${index}.txt
+  """
 }
