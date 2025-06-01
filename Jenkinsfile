@@ -23,13 +23,14 @@ pipeline {
     stage('Install Chromium & Dependencies') {
       steps {
         sh '''#!/bin/bash
+          echo "Installing Chromium and dependencies..."
           apt-get update && apt-get install -y \
             chromium chromium-driver \
             libgtk-3-0 libgbm-dev libnotify-dev libgconf-2-4 libnss3 \
             libxss1 libasound2 libxtst6 libxrandr2 x11-xkb-utils libglib2.0-0 \
             fonts-liberation libatk-bridge2.0-0 libatk1.0-0 libatspi2.0-0 \
             libpango-1.0-0 libudev1 libxcomposite1 libxdamage1 libxext6 \
-            libxfixes3 libxkbcommon0 xvfb time
+            libxfixes3 libxkbcommon0 xvfb
 
           ln -sf /usr/bin/chromium /usr/bin/google-chrome
         '''
@@ -41,8 +42,10 @@ pipeline {
         sh '''
           echo "Cypress version:"
           npx cypress --version || echo "❌ Cypress not found"
+
           echo "Spec files:"
           find . -name "*.spec.js" || echo "❌ No spec files found"
+
           echo "Chrome version:"
           google-chrome --version || echo "❌ Chrome not found"
         '''
@@ -111,7 +114,6 @@ pipeline {
     stage('Archive Test Report') {
       steps {
         archiveArtifacts artifacts: 'cypress/reports/**', allowEmptyArchive: true
-        archiveArtifacts artifacts: 'cypress_cpu_usage_*.txt', allowEmptyArchive: true
         archiveArtifacts artifacts: 'cypress_output_*.log', allowEmptyArchive: true
       }
     }
@@ -135,12 +137,13 @@ def runCypressChunk(index, totalChunks) {
     mkdir -p cypress/results
     echo "Splitting specs for chunk ${index}/${totalChunks}"
     node -e "
+      const fs = require('fs');
       const glob = require('glob');
       const specs = glob.sync('cypress/e2e/**/*.spec.js').sort();
       const chunkSize = Math.ceil(specs.length / ${totalChunks});
       const start = ${index} * chunkSize;
       const selected = specs.slice(start, start + chunkSize);
-      require('fs').writeFileSync('chunk-specs-${index}.txt', selected.join('\\n'));
+      fs.writeFileSync('chunk-specs-${index}.txt', selected.join('\\n'));
     "
 
     echo "Running specs for chunk ${index}:"
@@ -148,13 +151,16 @@ def runCypressChunk(index, totalChunks) {
 
     while IFS= read -r spec; do
       echo "Running spec: \$spec"
-      /usr/bin/time -v xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+      xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
         npx cypress run --browser chrome \
         --reporter mochawesome \
         --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \
-        --spec "\$spec" \
-        > "cypress_output_${index}.log" \
-        2> "cypress_cpu_usage_${index}.txt" || echo "⚠️ Failed: \$spec"
+        --spec "\$spec"
+
+      if [ \$? -ne 0 ]; then
+        echo "❌ Test failed: \$spec"
+        exit 1
+      fi
     done < chunk-specs-${index}.txt
   """
 }
