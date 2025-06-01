@@ -149,16 +149,12 @@ def runCypressChunk(index, totalChunks) {
 
     while IFS= read -r spec; do
       echo "Running spec: \$spec"
-      xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
-        npx cypress run --browser chromium \
-        --reporter mochawesome \
-        --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \
-        --spec "\$spec"
-
-      if [ \$? -ne 0 ]; then
-        echo "⚠️ Test failed: \$spec"
-        # Do not exit — continue with next spec
-      fi
+      xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \\
+        npx cypress run --browser chromium \\
+        --reporter mochawesome \\
+        --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \\
+        --spec "\$spec" || echo "⚠️ Test failed: \$spec"
     done < chunk-specs-${index}.txt
   """
 }
+
