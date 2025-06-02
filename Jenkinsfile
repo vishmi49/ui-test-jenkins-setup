@@ -140,13 +140,17 @@ def runCypressChunk(index, totalChunks) {
     echo "Specs assigned to chunk ${index}:"
     cat chunk-specs-${index}.txt
 
-    while IFS= read -r spec; do
-      echo "Running spec: \$spec"
-      xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \\
-        npx cypress run --browser chromium \\
-        --reporter mochawesome \\
-        --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \\
-        --spec "\$spec" || echo "⚠️ Test failed: \$spec"
-    done < chunk-specs-${index}.txt
+    # Combine all specs into one comma-separated line
+    SPECS=\$(paste -sd, chunk-specs-${index}.txt)
+
+    echo "Running Cypress for specs: \$SPECS"
+
+    xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \\
+      npx cypress run --browser chromium \\
+      --reporter mochawesome \\
+      --reporter-options "reportDir=cypress/results,overwrite=false,html=false,json=true" \\
+      --spec "\$SPECS" || echo "⚠️ Cypress tests failed"
   """
 }
+
+
